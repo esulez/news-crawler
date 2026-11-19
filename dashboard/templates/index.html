@@ -1,0 +1,466 @@
+{% extends "base.html" %}
+
+{% block title %}News Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .article-card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.2s;
+    }
+    .article-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .article-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 10px;
+    }
+    .article-title {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #333;
+        text-decoration: none;
+    }
+    .article-title:hover {
+        color: #007bff;
+    }
+    .article-source {
+        font-size: 0.8rem;
+        color: #666;
+        background: #f0f0f0;
+        padding: 4px 8px;
+        border-radius: 4px;
+    }
+    .article-meta {
+        display: flex;
+        gap: 10px;
+        font-size: 0.9rem;
+        color: #666;
+        margin-bottom: 10px;
+    }
+    .article-summary {
+        color: #444;
+        line-height: 1.6;
+        margin-bottom: 10px;
+    }
+    .article-actions {
+        display: flex;
+        gap: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #eee;
+    }
+    .article-actions a {
+        color: #666;
+        text-decoration: none;
+    }
+    .article-actions a:hover {
+        color: #007bff;
+    }
+    .cluster-badge {
+        display: inline-block;
+        background: #e3f2fd;
+        color: #1976d2;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+    }
+    .filters {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    .filter-group {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .filter-group label {
+        font-weight: bold;
+        color: #555;
+    }
+    .filter-group select, .filter-group input {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    .stats-bar {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-around;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+    .stat-item {
+        text-align: center;
+    }
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+    .stat-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    .loading {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+    }
+    .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #007bff;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .view-toggle {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    .view-toggle button {
+        padding: 10px 20px;
+        border: none;
+        background: #f0f0f0;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+    .view-toggle button.active {
+        background: #007bff;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stats-bar" id="stats-bar">
+    <div class="stat-item">
+        <div class="stat-value" id="total-articles">-</div>
+        <div class="stat-label">Total Articles</div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-value" id="total-clusters">-</div>
+        <div class="stat-label">Clusters</div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-value" id="total-sources">-</div>
+        <div class="stat-label">Sources</div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-value" id="clustered-articles">-</div>
+        <div class="stat-label">Clustered</div>
+    </div>
+</div>
+
+<div class="filters">
+    <div class="filter-group">
+        <label>View:</label>
+        <select id="view-select" onchange="changeView()">
+            <option value="all">All Articles</option>
+            <option value="recent">Recent (24h)</option>
+            <option value="deduplicated">Deduplicated</option>
+        </select>
+        
+        <label>Source:</label>
+        <select id="source-select" onchange="loadArticles()">
+            <option value="">All Sources</option>
+        </select>
+        
+        <label>Category:</label>
+        <select id="category-select" onchange="loadArticles()">
+            <option value="">All Categories</option>
+        </select>
+        
+        <label>Search:</label>
+        <input type="text" id="search-input" placeholder="Search articles..." onkeyup="searchArticles()">
+    </div>
+</div>
+
+<div id="articles-container">
+    <div class="loading">
+        <div class="spinner"></div>
+        <p>Loading articles...</p>
+    </div>
+</div>
+
+<div style="text-align: center; margin-top: 20px;">
+    <button onclick="loadMore()" id="load-more-btn" style="display: none; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+        <i class="fas fa-plus"></i> Load More
+    </button>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentOffset = 0;
+    const limit = 20;
+    let currentView = 'all';
+    let currentSource = '';
+    let currentCategory = '';
+    let currentSearch = '';
+    let hasMore = true;
+    
+    // Load initial data
+    document.addEventListener('DOMContentLoaded', function() {
+        loadStats();
+        loadSources();
+        loadCategories();
+        loadArticles();
+        updateLastUpdated();
+    });
+    
+    function loadStats() {
+        fetch('/api/stats')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('total-articles').textContent = data.total_articles || 0;
+                document.getElementById('total-clusters').textContent = data.total_clusters || 0;
+                document.getElementById('total-sources').textContent = data.total_sources || 0;
+                document.getElementById('clustered-articles').textContent = data.clustered_articles || 0;
+            });
+    }
+    
+    function loadSources() {
+        fetch('/api/sources')
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('source-select');
+                data.sources.forEach(source => {
+                    const option = document.createElement('option');
+                    option.value = source;
+                    option.textContent = source;
+                    select.appendChild(option);
+                });
+            });
+    }
+    
+    function loadCategories() {
+        fetch('/api/categories')
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('category-select');
+                data.categories.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category;
+                    option.textContent = category;
+                    select.appendChild(option);
+                });
+            });
+    }
+    
+    function loadArticles(reset = true) {
+        if (reset) {
+            currentOffset = 0;
+            hasMore = true;
+        }
+        
+        let url = `/api/articles?limit=${limit}&offset=${currentOffset}`;
+        
+        if (currentView === 'recent') {
+            url += '&hours=24';
+        } else if (currentView === 'deduplicated') {
+            url += '&deduplicated=true';
+        }
+        
+        if (currentSource) {
+            url += `&source=${encodeURIComponent(currentSource)}`;
+        }
+        
+        if (currentCategory) {
+            url += `&category=${encodeURIComponent(currentCategory)}`;
+        }
+        
+        if (currentSearch) {
+            url += `&search=${encodeURIComponent(currentSearch)}`;
+        }
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                displayArticles(data.articles, reset);
+                hasMore = data.articles.length >= limit;
+                document.getElementById('load-more-btn').style.display = hasMore ? 'block' : 'none';
+            });
+    }
+    
+    function displayArticles(articles, reset = true) {
+        const container = document.getElementById('articles-container');
+        
+        if (reset) {
+            container.innerHTML = '';
+        }
+        
+        if (articles.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">No articles found.</p>';
+            return;
+        }
+        
+        articles.forEach(article => {
+            const card = createArticleCard(article);
+            container.appendChild(card);
+        });
+    }
+    
+    function createArticleCard(article) {
+        const card = document.createElement('div');
+        card.className = 'article-card';
+        
+        const clusterBadge = article.cluster_id ? 
+            `<span class="cluster-badge">Cluster #${article.cluster_id}</span>` : '';
+        
+        const publishedDate = article.published_at ? new Date(article.published_at).toLocaleString() : '';
+        const crawledDate = new Date(article.crawled_at).toLocaleString();
+        
+        card.innerHTML = `
+            <div class="article-header">
+                <a href="/article/${article.id}" class="article-title">${article.title}</a>
+                <span class="article-source">${article.source} ${clusterBadge}</span>
+            </div>
+            <div class="article-meta">
+                <span><i class="fas fa-calendar"></i> ${publishedDate || crawledDate}</span>
+                <span><i class="fas fa-tag"></i> ${article.category}</span>
+                ${article.author ? `<span><i class="fas fa-user"></i> ${article.author}</span>` : ''}
+            </div>
+            <div class="article-summary">${article.summary || article.content.substring(0, 200) + '...'}</div>
+            <div class="article-actions">
+                <a href="${article.url}" target="_blank"><i class="fas fa-external-link-alt"></i> Read More</a>
+                ${article.cluster_id ? `<a href="/clusters?cluster=${article.cluster_id}"><i class="fas fa-project-diagram"></i> View Cluster</a>` : ''}
+            </div>
+        `;
+        
+        return card;
+    }
+    
+    function loadMore() {
+        currentOffset += limit;
+        loadArticles(false);
+    }
+    
+    function changeView() {
+        const select = document.getElementById('view-select');
+        currentView = select.value;
+        loadArticles();
+    }
+    
+    function searchArticles() {
+        const input = document.getElementById('search-input');
+        currentSearch = input.value;
+        
+        // Debounce search
+        clearTimeout(window.searchTimeout);
+        window.searchTimeout = setTimeout(() => {
+            loadArticles();
+        }, 500);
+    }
+    
+    function triggerCrawl() {
+        if (confirm('Trigger a new crawl? This may take a few minutes.')) {
+            showNotification('Starting crawl...', 'info');
+            fetch('/api/crawl', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({use_rss: true, use_scraping: true})
+            })
+            .then(response => response.json())
+            .then(data => {
+                showNotification(`Crawl complete! ${data.result.total_articles} articles found.`, 'success');
+                loadStats();
+                loadArticles();
+                updateLastUpdated();
+            })
+            .catch(error => {
+                showNotification('Crawl failed: ' + error.message, 'error');
+            });
+        }
+    }
+    
+    function triggerDeduplicate() {
+        if (confirm('Run deduplication? This will cluster similar articles.')) {
+            showNotification('Running deduplication...', 'info');
+            fetch('/api/deduplicate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({method: 'similarity'})
+            })
+            .then(response => response.json())
+            .then(data => {
+                showNotification(`Deduplication complete! ${data.result.clusters_created} clusters created.`, 'success');
+                loadStats();
+                loadArticles();
+            })
+            .catch(error => {
+                showNotification('Deduplication failed: ' + error.message, 'error');
+            });
+        }
+    }
+    
+    function updateLastUpdated() {
+        fetch('/api/stats')
+            .then(response => response.json())
+            .then(data => {
+                const lastUpdated = data.last_updated ? new Date(data.last_updated).toLocaleString() : 'Never';
+                document.getElementById('last-updated').textContent = `Last updated: ${lastUpdated}`;
+            });
+    }
+    
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `<i class="fas fa-info-circle"></i> ${message}`;
+        notification.style.position = 'fixed';
+        notification.style.bottom = '20px';
+        notification.style.right = '20px';
+        notification.style.padding = '15px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+        notification.style.zIndex = '1000';
+        
+        if (type === 'success') {
+            notification.style.background = '#d4edda';
+            notification.style.color = '#155724';
+        } else if (type === 'error') {
+            notification.style.background = '#f8d7da';
+            notification.style.color = '#721c24';
+        } else {
+            notification.style.background = '#d1ecf1';
+            notification.style.color = '#0c5460';
+        }
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transition = 'opacity 0.5s';
+            setTimeout(() => notification.remove(), 500);
+        }, 5000);
+    }
+    
+    // Update source and category filters
+    document.getElementById('source-select').addEventListener('change', function() {
+        currentSource = this.value;
+    });
+    
+    document.getElementById('category-select').addEventListener('change', function() {
+        currentCategory = this.value;
+    });
+</script>
+{% endblock %}

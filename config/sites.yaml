@@ -1,0 +1,86 @@
+# News Crawler Configuration
+# Define websites to crawl with their RSS feeds and selectors
+
+sites:
+  - name: "TechCrunch"
+    url: "https://techcrunch.com"
+    rss_feed: "https://techcrunch.com/feed/"
+    article_selector: "article.river-block"
+    title_selector: "h2.post-block__title a"
+    summary_selector: "div.post-block__content"
+    date_selector: "time.river-byline__full-date-time"
+    link_selector: "h2.post-block__title a"
+    category: "tech"
+    
+  - name: "The Verge"
+    url: "https://www.theverge.com"
+    rss_feed: "https://www.theverge.com/rss/index.xml"
+    article_selector: "div.duet--container--fluid"
+    title_selector: "h2 a"
+    summary_selector: "p"
+    date_selector: "time"
+    link_selector: "h2 a"
+    category: "tech"
+    
+  - name: "Ars Technica"
+    url: "https://arstechnica.com"
+    rss_feed: "https://arstechnica.com/feed/"
+    article_selector: "article"
+    title_selector: "h2 a"
+    summary_selector: "p.excerpt"
+    date_selector: "time"
+    link_selector: "h2 a"
+    category: "tech"
+    
+  - name: "Wired"
+    url: "https://www.wired.com"
+    rss_feed: "https://www.wired.com/feed/rss"
+    article_selector: "div.archive-card-component"
+    title_selector: "h2 a"
+    summary_selector: "p"
+    date_selector: "time"
+    link_selector: "h2 a"
+    category: "tech"
+    
+  - name: "Hacker News"
+    url: "https://news.ycombinator.com"
+    rss_feed: "https://hnrss.org/newest"
+    article_selector: "tr.athing"
+    title_selector: "span.titleline a"
+    summary_selector: "span.score"
+    date_selector: "span.age"
+    link_selector: "span.titleline a"
+    category: "tech"
+    
+  - name: "BBC Technology"
+    url: "https://www.bbc.com/news/technology"
+    rss_feed: "http://feeds.bbci.co.uk/news/technology/rss.xml"
+    article_selector: "div.lx-stream-post"
+    title_selector: "h3 a"
+    summary_selector: "p"
+    date_selector: "time"
+    link_selector: "h3 a"
+    category: "tech"
+
+# Crawler settings
+crawler:
+  user_agent: "NewsCrawler/1.0"
+  request_timeout: 10
+  max_articles_per_site: 50
+  crawl_interval_hours: 1
+  
+# Deduplication settings
+deduplication:
+  similarity_threshold: 0.85
+  use_tfidf: true
+  use_embeddings: false
+  
+# Database settings
+database:
+  path: "data/news.db"
+  
+# Dashboard settings
+dashboard:
+  host: "0.0.0.0"
+  port: 5000
+  debug: true

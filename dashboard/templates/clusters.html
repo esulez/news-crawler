@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+
+{% block title %}Article Clusters{% endblock %}
+
+{% block extra_css %}
+<style>
+    .cluster-card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .cluster-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #007bff;
+    }
+    .cluster-topic {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #333;
+    }
+    .cluster-meta {
+        display: flex;
+        gap: 15px;
+        font-size: 0.9rem;
+        color: #666;
+    }
+    .cluster-articles {
+        margin-top: 15px;
+    }
+    .article-in-cluster {
+        background: #f8f9fa;
+        padding: 10px;
+        margin-bottom: 8px;
+        border-radius: 4px;
+        border-left: 3px solid #007bff;
+    }
+    .article-in-cluster:hover {
+        background: #e9ecef;
+    }
+    .article-in-cluster a {
+        color: #333;
+        text-decoration: none;
+        font-weight: 500;
+    }
+    .article-in-cluster a:hover {
+        color: #007bff;
+    }
+    .representative-badge {
+        background: #28a745;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.7rem;
+        margin-left: 10px;
+    }
+    .cluster-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+    }
+    .cluster-actions button {
+        padding: 8px 16px;
+        border: none;
+        background: #f0f0f0;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+    .cluster-actions button:hover {
+        background: #e0e0e0;
+    }
+    .cluster-actions button.danger {
+        background: #dc3545;
+        color: white;
+    }
+    .cluster-actions button.danger:hover {
+        background: #c82333;
+    }
+    .loading-spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #007bff;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 20px auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h2><i class="fas fa-project-diagram"></i> Article Clusters</h2>
+<p style="color: #666; margin-bottom: 20px;">Articles grouped by similarity. Each cluster represents a unique news topic.</p>
+
+<div style="margin-bottom: 20px;">
+    <button onclick="loadClusters()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+        <i class="fas fa-sync-alt"></i> Refresh Clusters
+    </button>
+    <button onclick="resetClusters()" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">
+        <i class="fas fa-trash"></i> Reset All Clusters
+    </button>
+</div>
+
+<div id="clusters-container">
+    <div style="text-align: center; padding: 40px;">
+        <div class="loading-spinner"></div>
+        <p>Loading clusters...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        loadClusters();
+    });
+    
+    function loadClusters() {
+        fetch('/api/clusters')
+            .then(response => response.json())
+            .then(data => {
+                displayClusters(data.clusters);
+            })
+            .catch(error => {
+                document.getElementById('clusters-container').innerHTML = 
+                    '<p style="color: red; text-align: center;">Error loading clusters: ' + error.message + '</p>';
+            });
+    }
+    
+    function displayClusters(clusters) {
+        const container = document.getElementById('clusters-container');
+        
+        if (clusters.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">No clusters found. Run deduplication first.</p>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        
+        clusters.forEach(cluster => {
+            const card = createClusterCard(cluster);
+            container.appendChild(card);
+        });
+    }
+    
+    function createClusterCard(cluster) {
+        const card = document.createElement('div');
+        card.className = 'cluster-card';
+        
+        const createdDate = new Date(cluster.created_at).toLocaleString();
+        const updatedDate = new Date(cluster.updated_at).toLocaleString();
+        
+        card.innerHTML = `
+            <div class="cluster-header">
+                <h3 class="cluster-topic">${cluster.topic}</h3>
+                <span style="color: #666;">Cluster #${cluster.id}</span>
+            </div>
+            <div class="cluster-meta">
+                <span><i class="fas fa-newspaper"></i> ${cluster.article_count} articles</span>
+                <span><i class="fas fa-calendar"></i> Created: ${createdDate}</span>
+                <span><i class="fas fa-clock"></i> Updated: ${updatedDate}</span>
+            </div>
+            <div class="cluster-actions">
+                <button onclick="viewCluster(${cluster.id})"><i class="fas fa-eye"></i> View Articles</button>
+                <button onclick="deleteCluster(${cluster.id})" class="danger"><i class="fas fa-trash"></i> Delete</button>
+            </div>
+            <div id="cluster-${cluster.id}-articles" style="display: none; margin-top: 15px;"></div>
+        `;
+        
+        return card;
+    }
+    
+    function viewCluster(clusterId) {
+        const articlesDiv = document.getElementById(`cluster-${clusterId}-articles`);
+        
+        if (articlesDiv.style.display === 'block') {
+            articlesDiv.style.display = 'none';
+            return;
+        }
+        
+        if (articlesDiv.innerHTML) {
+            articlesDiv.style.display = 'block';
+            return;
+        }
+        
+        articlesDiv.innerHTML = '<div class="loading-spinner"></div><p style="text-align: center;">Loading articles...</p>';
+        articlesDiv.style.display = 'block';
+        
+        fetch(`/api/clusters/${clusterId}`)
+            .then(response => response.json())
+            .then(data => {
+                displayClusterArticles(articlesDiv, data.articles, data.cluster.representative_article_id);
+            })
+            .catch(error => {
+                articlesDiv.innerHTML = '<p style="color: red;">Error loading articles: ' + error.message + '</p>';
+            });
+    }
+    
+    function displayClusterArticles(container, articles, representativeId) {
+        container.innerHTML = '<h4 style="margin-bottom: 10px;">Articles in this cluster:</h4>';
+        
+        articles.forEach(article => {
+            const articleDiv = document.createElement('div');
+            articleDiv.className = 'article-in-cluster';
+            
+            const isRepresentative = article.id === representativeId;
+            const representativeBadge = isRepresentative ? '<span class="representative-badge">Representative</span>' : '';
+            
+            articleDiv.innerHTML = `
+                <a href="/article/${article.id}">${article.title}</a>
+                ${representativeBadge}
+                <div style="font-size: 0.8rem; color: #666; margin-top: 5px;">
+                    <span>${article.source}</span> | <span>${new Date(article.crawled_at).toLocaleDateString()}</span>
+                </div>
+            `;
+            
+            container.appendChild(articleDiv);
+        });
+    }
+    
+    function deleteCluster(clusterId) {
+        if (confirm('Are you sure you want to delete this cluster? The articles will remain but will be unclustered.')) {
+            fetch(`/api/clusters/${clusterId}`, {method: 'DELETE'})
+                .then(response => response.json())
+                .then(data => {
+                    showNotification('Cluster deleted successfully!', 'success');
+                    loadClusters();
+                })
+                .catch(error => {
+                    showNotification('Error deleting cluster: ' + error.message, 'error');
+                });
+        }
+    }
+    
+    function resetClusters() {
+        if (confirm('Are you sure you want to reset ALL clusters? This cannot be undone.')) {
+            fetch('/api/reset-clusters', {method: 'POST'})
+                .then(response => response.json())
+                .then(data => {
+                    showNotification(`${data.reset_count} articles unclustered.`, 'success');
+                    loadClusters();
+                })
+                .catch(error => {
+                    showNotification('Error resetting clusters: ' + error.message, 'error');
+                });
+        }
+    }
+    
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `<i class="fas fa-info-circle"></i> ${message}`;
+        notification.style.position = 'fixed';
+        notification.style.bottom = '20px';
+        notification.style.right = '20px';
+        notification.style.padding = '15px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+        notification.style.zIndex = '1000';
+        
+        if (type === 'success') {
+            notification.style.background = '#d4edda';
+            notification.style.color = '#155724';
+        } else if (type === 'error') {
+            notification.style.background = '#f8d7da';
+            notification.style.color = '#721c24';
+        } else {
+            notification.style.background = '#d1ecf1';
+            notification.style.color = '#0c5460';
+        }
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transition = 'opacity 0.5s';
+            setTimeout(() => notification.remove(), 500);
+        }, 5000);
+    }
+</script>
+{% endblock %}

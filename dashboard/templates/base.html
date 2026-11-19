@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}News Crawler Dashboard{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1><i class="fas fa-newspaper"></i> News Crawler</h1>
+            <nav>
+                <a href="/"><i class="fas fa-home"></i> Home</a>
+                <a href="/sources"><i class="fas fa-rss"></i> Sources</a>
+                <a href="/clusters"><i class="fas fa-project-diagram"></i> Clusters</a>
+                <a href="#" onclick="triggerCrawl()"><i class="fas fa-sync-alt"></i> Crawl</a>
+                <a href="#" onclick="triggerDeduplicate()"><i class="fas fa-compress-alt"></i> Deduplicate</a>
+            </nav>
+        </div>
+    </header>
+    
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>News Crawler Dashboard | <span id="last-updated">Loading...</span></p>
+        </div>
+    </footer>
+    
+    <script src="/static/js/app.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

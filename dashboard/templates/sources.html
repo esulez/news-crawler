@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}News Sources{% endblock %}
+
+{% block extra_css %}
+<style>
+    .source-card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .source-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    .source-name {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #333;
+    }
+    .source-url {
+        color: #007bff;
+        text-decoration: none;
+    }
+    .source-url:hover {
+        text-decoration: underline;
+    }
+    .source-stats {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 15px;
+    }
+    .stat-item {
+        text-align: center;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        min-width: 80px;
+    }
+    .stat-value {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #007bff;
+    }
+    .stat-label {
+        font-size: 0.8rem;
+        color: #666;
+    }
+    .articles-list {
+        margin-top: 15px;
+    }
+    .article-item {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+    }
+    .article-item:last-child {
+        border-bottom: none;
+    }
+    .article-item a {
+        color: #333;
+        text-decoration: none;
+    }
+    .article-item a:hover {
+        color: #007bff;
+    }
+    .article-meta {
+        font-size: 0.8rem;
+        color: #666;
+        margin-top: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h2><i class="fas fa-rss"></i> News Sources</h2>
+<p style="color: #666; margin-bottom: 20px;">Configured news sources and their article counts.</p>
+
+<div id="sources-container">
+    <div style="text-align: center; padding: 40px;">
+        <div class="spinner"></div>
+        <p>Loading sources...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        loadSources();
+    });
+    
+    function loadSources() {
+        // Get all articles first
+        fetch('/api/articles?limit=1000')
+            .then(response => response.json())
+            .then(data => {
+                // Group by source
+                const sources = {};
+                data.articles.forEach(article => {
+                    if (!sources[article.source]) {
+                        sources[article.source] = {
+                            name: article.source,
+                            url: article.url,
+                            articles: [],
+                            count: 0,
+                        };
+                    }
+                    sources[article.source].articles.push(article);
+                    sources[article.source].count++;
+                });
+                
+                displaySources(Object.values(sources));
+            })
+            .catch(error => {
+                document.getElementById('sources-container').innerHTML = 
+                    '<p style="color: red; text-align: center;">Error loading sources: ' + error.message + '</p>';
+            });
+    }
+    
+    function displaySources(sources) {
+        const container = document.getElementById('sources-container');
+        
+        if (sources.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">No sources found.</p>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        
+        // Sort by article count
+        sources.sort((a, b) => b.count - a.count);
+        
+        sources.forEach(source => {
+            const card = createSourceCard(source);
+            container.appendChild(card);
+        });
+    }
+    
+    function createSourceCard(source) {
+        const card = document.createElement('div');
+        card.className = 'source-card';
+        
+        // Extract domain from URL
+        let domain = source.url;
+        try {
+            domain = new URL(source.url).hostname;
+        } catch (e) {
+            // URL might be relative or invalid
+        }
+        
+        // Get most recent articles
+        const recentArticles = source.articles
+            .sort((a, b) => new Date(b.crawled_at) - new Date(a.crawled_at))
+            .slice(0, 5);
+        
+        let articlesHtml = '';
+        if (recentArticles.length > 0) {
+            articlesHtml = '<div class="articles-list"><h4>Recent Articles:</h4>';
+            recentArticles.forEach(article => {
+                const date = new Date(article.crawled_at).toLocaleDateString();
+                articlesHtml += `
+                    <div class="article-item">
+                        <a href="/article/${article.id}">${article.title}</a>
+                        <div class="article-meta">${date}</div>
+                    </div>
+                `;
+            });
+            articlesHtml += '</div>';
+        }
+        
+        card.innerHTML = `
+            <div class="source-header">
+                <h3 class="source-name">${source.name}</h3>
+                <a href="${source.url}" target="_blank" class="source-url">${domain}</a>
+            </div>
+            <div class="source-stats">
+                <div class="stat-item">
+                    <div class="stat-value">${source.count}</div>
+                    <div class="stat-label">Articles</div>
+                </div>
+            </div>
+            ${articlesHtml}
+        `;
+        
+        return card;
+    }
+</script>
+{% endblock %}
